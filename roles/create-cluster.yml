@@ -1,0 +1,137 @@
+--- 
+- name: Provision and configure a WordPress cluster on AWS
+  hosts: localhost
+  connection: local
+  gather_facts: False
+
+  vars_files:
+    - vars/mysql.yml
+    
+  tasks:
+    - name: Starting MYSQL machine
+      local_action:
+        module: ec2
+        image: "{{ IMAGE }}"
+        instance_type: "{{ INSTANCE_TYPE }}"
+        keypair: "{{ KEYPAIR }}"
+        region: "{{ EC2_REGION }}"
+        group_id: "{{ NODE_SECURITY_GROUP }}"
+        vpc_subnet_id: "{{ SUBNET_SEED }}"
+        assign_public_ip: yes
+        instance_tags:
+          Name: "{{ TAG_NAME }}"
+          Role: mysql
+        count: 1
+        volumes:
+          - device_name: /dev/sda1
+            device_type: "{{VOL_TYPE }}"
+            volume_size: "{{ VOL_SIZE }}"
+            delete_on_termination: true
+        wait: yes
+      register: ec2
+
+    - debug: msg="Mysql {{ ec2.instances[0].private_ip }}"
+	
+    - name: Add mysql to mysql_private
+      add_host:
+        groupname: "mysql_private"
+        hostname: "{{ ec2.instances[0].private_ip }}"
+	
+    - name: Launch HAProxy machine
+      local_action:
+        module: ec2
+        image: "{{ IMAGE }}"
+        instance_type: "{{ INSTANCE_TYPE }}"
+        keypair: "{{ KEYPAIR }}"
+        region: "{{ EC2_REGION }}"
+        group_id: "{{ NODE_SECURITY_GROUP }}"
+        vpc_subnet_id: "{{ SUBNET_SEED }}"
+        assign_public_ip: yes
+        instance_tags:
+          Name: "{{ TAG_NAME }}"
+          Role: HAProxy
+        count: 1
+        volumes:
+          - device_name: /dev/sda1
+            device_type: "{{ VOL_TYPE }}"
+            volume_size: "{{ VOL_SIZE }}"
+            delete_on_termination: true
+        wait: yes
+      register: ec2
+	
+    - debug: msg="HAProxy node {{ ec2.instances[0].private_ip }} --- {{ ec2.instances[0].public_ip }}"
+	
+    - name: Add HAProxy to haproxy_private
+      add_host:
+        groupname: "haproxy_private"
+        hostname: "{{ ec2.instances[0].private_ip }}"
+		
+    - name: Add HAProxy to haproxy_public
+      add_host:
+        groupname: "haproxy_public"
+        hostname: "{{ ec2.instances[0].public_ip }}"
+	
+    tasks:
+    - name: Starting WP machines
+      local_action:
+        module: ec2
+        image: "{{ IMAGE }}"
+        instance_type: "{{ INSTANCE_TYPE }}"
+        keypair: "{{ KEYPAIR }}"
+        region: "{{ EC2_REGION }}"
+        group_id: "{{ NODE_SECURITY_GROUP }}"
+        vpc_subnet_id: "{{ SUBNET_SEED }}"
+        assign_public_ip: yes
+        instance_tags:
+          Name: "{{ TAG_NAME }}"
+          Role: worker
+        count: 3
+        volumes:
+          - device_name: /dev/sda1
+            device_type: "{{VOL_TYPE }}"
+            volume_size: "{{ VOL_SIZE }}"
+            delete_on_termination: true
+        wait: yes
+      register: ec2
+	
+    - name: Add private addresses ip to wp_private
+      add_host:
+        groupname: "wp_private"
+        hostname: "{{ item.instances[0].private_ip }}"
+      with_items: "{{ ec2.results }}"
+	
+- name: Install MySQL
+  hosts: mysql_private
+  user: "{{ REMOTE_USER }}"
+  gather_facts: True
+  sudo: True
+
+  vars_files:
+    - "{{ VARS_FILE }}"
+
+  tasks:
+    - include: "bundle/tasks/install-conductr-haproxy.yml"
+	
+- name: Install HAProxy
+  hosts: haproxy_public
+  user: "{{ REMOTE_USER }}"
+  gather_facts: True
+  sudo: True
+
+  vars_files:
+    - "{{ VARS_FILE }}"
+
+  tasks:
+    - include: "bundle/tasks/install-conductr-haproxy.yml"
+	
+- name: Install Wordpress
+  hosts: wp_private
+  user: "{{ REMOTE_USER }}"
+  gather_facts: True
+  sudo: True
+
+  vars_files:
+    - "{{ VARS_FILE }}"
+
+  tasks:
+    - include: "bundle/tasks/install-conductr-haproxy.yml"	
