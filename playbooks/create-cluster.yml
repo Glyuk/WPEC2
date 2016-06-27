@@ -31,6 +31,10 @@
         wait: yes
       register: ec2
 
+    - name: Set MySQL ip address as fact
+      set_fact: mysql_ip="{{ ec2.instances[0].private_ip }}"
+
+
     - name: Add mysql to mysql_private
       add_host:
         groupname: "mysql_private"
@@ -47,10 +51,10 @@
         vpc_subnet_id: "{{ SUBNET_SEED }}"
         assign_public_ip: yes
         instance_tags:
-          Name: "{{ TAG_NAME }}"
+          Name: Proxy
           Role: HAProxy
           Class: wpserver
-        count: 1
+        count: 0
         volumes:
           - device_name: /dev/sda1
             device_type: "{{ VOL_TYPE }}"
@@ -58,6 +62,7 @@
             delete_on_termination: true
         wait: yes
       register: ec2
+
     - name: Add HAProxy to haproxy_private
       add_host:
         groupname: "haproxy_private"
@@ -79,10 +84,10 @@
         vpc_subnet_id: "{{ SUBNET_SEED }}"
         assign_public_ip: yes
         instance_tags:
-          Name: "{{ TAG_NAME }}"
+          Name: wpserver
           Role: worker
           Class: wpserver
-        count: 3
+        count: 2
         volumes:
           - device_name: /dev/sda1
             device_type: "{{VOL_TYPE }}"
@@ -94,20 +99,21 @@
     - name: Add private addresses ip to wp_private
       add_host:
         groupname: "wp_private"
-        hostname: "{{ item.instances[0].private_ip }}"
-      with_items: "{{ ec2.results }}"
+        hostname: "{{ item.private_ip }}"
+      with_items: "{{ ec2.instances }}"
 
-- name: Install MySQL
+- name: Apply mysql role
   hosts: mysql_private
   user: "{{ REMOTE_USER }}"
-  gather_facts: True
+  gather_facts: False
   sudo: True
-
+ 
   vars_files:
-    - "{{ VARS_FILE }}"
+  - vars/mysql.yml
+ 
+  roles:
+  - { role: pcextreme.mariadb }
 
-  tasks:
-    - include: "bundle/tasks/install-conductr-haproxy.yml"
 
 - name: Install HAProxy
   hosts: haproxy_public
@@ -123,12 +129,15 @@
 
 - name: Install Wordpress
   hosts: wp_private
-  user: "{{ REMOTE_USER }}"
-  gather_facts: True
+  user: centos
+  gather_facts: False
   sudo: True
-
-  vars_files:
-    - "{{ VARS_FILE }}"
-
-  tasks:
-    - include: "bundle/tasks/install-conductr-haproxy.yml"	
+  vars:
+    wp_version: 4.0
+    wp_install_dir: '/var/sites/awesome_wordpress_site'
+    wp_db_name: 'wpdb'
+    wp_db_user: 'wpuser'
+    wp_db_password: 'wppass'
+    wp_db_host: "{{ mysql_ip }}"
+  roles:
+  - darthwade.wordpress
