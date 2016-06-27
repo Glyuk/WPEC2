@@ -1,0 +1,18 @@
+---
+# Must be set to the key pair name of the file passed to playbook
+KEYPAIR: "gl-test2"
+
+# This image is Ubuntu 14.04 LTS amd64 hvm:ebs-ssd in us-east-1
+# Must be changed to region local Ubuntu AMI for all other regions
+IMAGE: "ami-d2c924b2"
+
+REMOTE_USER: "centos"
+INSTANCE_TYPE: "t2.micro"
+EC2_REGION: "us-west-2"
+ENABLE_DEBUG: "false"
+VOL_TYPE: "gp2"
+VOL_SIZE: 30
+NODE_SECURITY_GROUP: "sg-74b51512"
+SUBNET_SEED: "subnet-6eb40118"
+TAG_NAME: "mysql"
+TAG_CLASS: "wpservers"

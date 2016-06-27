@@ -1,0 +1,12 @@
+---
+- name: Terminate WP cluster
+  hosts:
+    - tag_Class_wpserver
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Terminate all WP machines
+      local_action:
+        module: ec2
+        region: '{{ ec2_region }}'
+        instance_ids: '{{ ec2_id }}'
