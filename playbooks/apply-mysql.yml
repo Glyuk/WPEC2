@@ -1,10 +1,11 @@
 ---
 - name: Apply mysql role
   hosts: tag_Name_mysql
-  gather_facts: False
+  user: "{{ REMOTE_USER }}"
+  gather_facts: True
+  sudo: True
 
   vars_files:
     - vars/mysql.yml
-
   roles:
-  - { role: pcextreme.mariadb }
+  - { role: geerlingguy.mysql }

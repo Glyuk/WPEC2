@@ -16,3 +16,16 @@ NODE_SECURITY_GROUP: "sg-74b51512"
 SUBNET_SEED: "subnet-6eb40118"
 TAG_NAME: "mysql"
 TAG_CLASS: "wpservers"
+
+mysql_root_password: 7sx8w2njj
+mysql_databases:
+  - name: wpdb
+    encoding: utf8
+mysql_users:
+  - name: wpuser
+    host: "%"
+    password: wppass
+    priv: "wpdb.*:ALL"
+
+ansible_os_family: "RedHat"
+ansible_distribution_major_version: 7

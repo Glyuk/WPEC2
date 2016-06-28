@@ -1,0 +1,3 @@
+- name: Allow Apache to use non local mysql hosts
+  
+  seboolean: name=httpd_can_network_connect state=yes persistent=yes
