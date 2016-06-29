@@ -1,0 +1,23 @@
+--- 
+- name: Provision and configure Auto-scaling group
+  ec2_lc:
+        name: my_new_lc
+        image_id: ami-00498f60
+        key_name: gl-test2
+        region: us-west-2
+        security_groups: sg-74b51512
+        instance_type: t2.micro
+        assign_public_ip: yes
+
+    
+- name: Starting group
+  ec2_asg:
+        name: myasg
+        launch_config_name: my_new_lc
+        health_check_period: 60
+        health_check_type: ELB
+        replace_all_instances: yes
+        min_size: 5
+        max_size: 5
+        desired_capacity: 5
+        region: us-west-2

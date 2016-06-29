@@ -1,0 +1,8 @@
+---
+- name: Provision and configure a WordPress cluster on AWS
+  hosts: localhost
+  connection: local
+  gather_facts: True
+
+  tasks:
+    - include: tasks/launch-asg.yml
