@@ -8,7 +8,7 @@
     - vars/mysql.yml
 
   tasks:
-    - name: Starting WP machines
+    - name: Starting Proxy machine
       local_action:
         module: ec2
         image: "{{ IMAGE }}"
@@ -19,10 +19,10 @@
         vpc_subnet_id: "{{ SUBNET_SEED }}"
         assign_public_ip: yes
         instance_tags:
-          Name: wpserver
-          Role: worker
+          Name: ha
+          Role: proxy
           Class: wpserver
-        count: 2
+        count: 1
         volumes:
         - device_name: /dev/sda1
           device_type: "{{VOL_TYPE }}"
@@ -44,38 +44,31 @@
 
 
     - name: Add new instance to host group
-      local_action: add_host hostname={{ item.private_ip }} groupname=workers
+      local_action: add_host hostname={{ item.private_ip }} groupname=proxy
       with_items: ec2.instances
 
 - name: Apply wp role
-  hosts: tag_Role_worker
-#  hosts: workers
+#  hosts: proxy
+  hosts: tag_Name_ha
   user: "{{ REMOTE_USER }}"
-  gather_facts: True
-  vars_files:
-  - vars/mysql.yml
   sudo: True
+
+  gather_facts: True
   vars:
-    wp_version: 4.0
-    wp_install_dir: '/var/www/awesome_wordpress_site'
-    wp_db_name: 'wpdb'
-    wp_db_user: 'wpuser'
-    wp_db_password: 'wppass'
-    wp_db_host: "{{ mysql_ip }}"
-    wp_apache_hostname: 'local.dev'
-    wp_apache_alias: 'localhost'
-    wp_apache_admin_email: 'admin@example.com'
-  pre_tasks:
-  - include: tasks/epel.yml
+    LISTEN_ON: ":80"
+    haproxy_backend_servers:
+      - name: app1
+        address: "{{ hostvars[inventory_hostname].groups.tag_Name_wpserver[0]+':80'}}"
+      - name: app2
+        address: "{{ hostvars[inventory_hostname].groups.tag_Name_wpserver[0]+':80'}}"
+ 
 
+
+  vars_files:
+    - vars/proxy.yml
   roles:
-  - { role: geerlingguy.apache }
-  - { role: geerlingguy.php }
-  - { role: darthwade.wordpress-apache, mysql_ip: 192.168.1.119 }
-
-  post_tasks:
-  - include: tasks/selinux.yml
+    - { role: kevincoakley.haproxy }
   tags:
-    - selinux
+    - haproxy
 
 

@@ -34,9 +34,9 @@
     - debug: var=ec2.instances[0].private_ip
 
 
-    - name: Wait for SSH to come up
-      wait_for: host={{ item.private_ip }} port=22 delay=60 timeout=900 state=started
-      with_items: '{{ec2.instances}}'
+#    - name: Wait for SSH to come up
+#      wait_for: host={{ item.private_ip }} port=22 delay=60 timeout=900 state=started
+#      with_items: '{{ec2.instances}}'
 
     - name: Add new instance to host group
       local_action: add_host hostname={{ item.private_ip }} groupname=launched
@@ -53,39 +53,7 @@
         hostname: "{{ ec2.instances[0].private_ip }}"
 
     - debug: var=hostvars['localhost'].mysql_ip
-#    - name: Launch HAProxy machine
-#      local_action:
-#        module: ec2
-#        image: "{{ IMAGE }}"
-#        instance_type: "{{ INSTANCE_TYPE }}"
-#        keypair: "{{ KEYPAIR }}"
-#        region: "{{ EC2_REGION }}"
-#        group_id: "{{ NODE_SECURITY_GROUP }}"
-#        vpc_subnet_id: "{{ SUBNET_SEED }}"
-#        assign_public_ip: yes
-#        instance_tags:
-#          Name: Proxy
-#          Role: HAProxy
-#          Class: wpserver
-#        count: 0
-#        volumes:
-#          - device_name: /dev/sda1
-#            device_type: "{{ VOL_TYPE }}"
-#            volume_size: "{{ VOL_SIZE }}"
-#            delete_on_termination: true
-#        wait: yes
-#      register: ec2
-#
-#    - name: Add HAProxy to haproxy_private
-#      add_host:
-#        groupname: "haproxy_private"
-#        hostname: "{{ ec2.instances[0].private_ip }}"
-#
-#    - name: Add HAProxy to haproxy_public
-#      add_host:
-#        groupname: "haproxy_public"
-#        hostname: "{{ ec2.instances[0].public_ip }}"
-#
+    
     - name: Starting WP machines
       local_action:
         module: ec2
@@ -100,7 +68,7 @@
           Name: wpserver
           Role: worker
           Class: wpserver
-        count: 2
+        count: 3
         volumes:
           - device_name: /dev/sda1
             device_type: "{{VOL_TYPE }}"
@@ -109,9 +77,9 @@
         wait: yes
       register: ec2
 
-    - name: Wait for SSH to come up
-      wait_for: host={{ item.private_ip }} port=22 delay=60 timeout=900 state=started
-      with_items: '{{ec2.instances}}'
+#    - name: Wait for SSH to come up
+#      wait_for: host={{ item.private_ip }} port=22 delay=60 timeout=900 state=started
+#      with_items: '{{ec2.instances}}'
 
 
     - name: Add private addresses ip to wp_private
@@ -119,6 +87,65 @@
         groupname: "wp_private"
         hostname: "{{ item.private_ip }}"
       with_items: "{{ ec2.instances }}"
+
+    - name: Starting Proxy machine
+      local_action:
+        module: ec2
+        image: "{{ IMAGE }}"
+        instance_type: "{{ INSTANCE_TYPE }}"
+        keypair: "{{ KEYPAIR }}"
+        region: "{{ EC2_REGION }}"
+        group_id: "{{ NODE_SECURITY_GROUP }}"
+        vpc_subnet_id: "{{ SUBNET_SEED }}"
+        assign_public_ip: yes
+        instance_tags:
+          Name: ha
+          Role: proxy
+          Class: wpserver
+        count: 1
+        volumes:
+        - device_name: /dev/sda1
+          device_type: "{{VOL_TYPE }}"
+          volume_size: "{{ VOL_SIZE }}"
+          delete_on_termination: true
+        wait: yes
+      register: ec2
+
+    - name: Wait for SSH to come up
+      wait_for: host={{ item.private_ip }} port=22 delay=60 timeout=900 state=started
+      with_items: '{{ec2.instances}}'
+
+    - name: Add new instance to host group
+      local_action: add_host hostname={{ item.private_ip }} groupname=proxy
+      with_items: ec2.instances
+    
+- name: Apply wp role
+  hosts: proxy
+#  hosts: tag_Name_ha
+  user: "{{ REMOTE_USER }}"
+  sudo: True
+
+  gather_facts: True
+  vars:
+    LISTEN_ON: ":80"
+    haproxy_backend_servers:
+      - name: app1
+        address: "{{ hostvars[inventory_hostname].groups.wp_private[0]+':80'}}"
+      - name: app2
+        address: "{{ hostvars[inventory_hostname].groups.wp_private[1]+':80'}}"
+      - name: app3
+        address: "{{ hostvars[inventory_hostname].groups.wp_private[2]+':80'}}"
+
+
+
+  vars_files:
+    - vars/proxy.yml
+  roles:
+    - { role: kevincoakley.haproxy }
+  tags:
+    - haproxy
+
+
 
 - name: Apply mysql role
   hosts: mysql_private
@@ -155,3 +182,6 @@
   - { role: geerlingguy.apache }
   - { role: geerlingguy.php }
   - { role: darthwade.wordpress-apache }
+
+  post_tasks:
+  - include: tasks/selinux.yml

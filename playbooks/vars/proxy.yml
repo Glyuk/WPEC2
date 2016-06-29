@@ -1,0 +1,9 @@
+---
+REMOTE_USER: centos
+#haproxy_backend_servers:
+#  - name: app1
+#    address: 192.168.1.23
+#  - name: app2
+#    address: 192.168.1.25
+#  - name: app3
+#    address: "{{ ip_3 }}"

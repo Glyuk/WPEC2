@@ -1,3 +1,9 @@
 - name: Allow Apache to use non local mysql hosts
   
   seboolean: name=httpd_can_network_connect state=yes persistent=yes
+
+- name: Allow scripts execution
+  command: semanage fcontext -a -t httpd_sys_script_exec_t '/var/www(/.*)?'
+
+- name: Apply policy
+  command: restorecon -R -v /var/www/
