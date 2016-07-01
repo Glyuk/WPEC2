@@ -5,6 +5,4 @@
   gather_facts: True
 
   tasks:
-    - include: tasks/set-lb.yml
-    - include: tasks/launch-asg.yml
-    - include: tasks/alarms.yml
+    - include: tasks/delete-asg.yml

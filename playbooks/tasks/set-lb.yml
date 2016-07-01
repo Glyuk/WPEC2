@@ -1,0 +1,60 @@
+- name: Get instance ec2 facts
+  action: ec2_facts
+  register: ec2_facts
+
+#- name: Get resource tags from ec2 facts
+#  sudo: false
+#  local_action: ec2_tag
+#    resource={{ec2_facts.ansible_facts}}
+#    region=us-west-2 state=list
+#  register: result
+
+- debug: var=result
+
+#- name: Create CPU utilization metric alarm
+#  sudo: false
+#  local_action:
+#    ec2_metric_alarm
+#    state=present
+#    region=us-east-1
+#    name="{{result.Name}}-cpu-utilization"
+#    metric="CPUUtilization"
+#    statistic=Average
+#    comparison=">="
+#    threshold=10.0
+#    unit="Percent"
+#    period=60
+#    evaluation_periods=1
+#    description "Test CPU"
+
+- name: Setup a load balancer
+  ec2_elb_lb:
+    name: gllb
+    state: present
+    region: us-west-2
+    security_group_ids: 'sg-74b51512'
+    subnets: 'subnet-6eb40118'
+#    zones:
+#      - us-west-2b
+    listeners:
+      - protocol: http
+        load_balancer_port: 80
+        instance_port: 80
+    health_check:
+      ping_protocol: http # options are http, https, ssl, tcp
+      ping_port: 80
+      ping_path: "/healthcheck/index.php"
+      response_timeout: 5 # seconds
+      interval: 30 # seconds
+      unhealthy_threshold: 2
+      healthy_threshold: 10
+  register: aws-elb
+
+#- name: add the  webservers to the load balancer
+#  local_action: ec2_elb
+#  args:
+#    instance_id: "{{ item.id }}"
+#    ec2_elbs: aws-elb
+#    state: present
+#    region: us-west-2
+#    with_items: "{{result.tag_group_asg1}}"
