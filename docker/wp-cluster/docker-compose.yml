@@ -1,0 +1,55 @@
+version: '2'
+services:
+  db:
+    image: mysql:5.7
+    ports:
+      - "3306:3306"
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpw
+      MYSQL_DATABASE: wpdb
+      MYSQL_USER: wpuser
+      MYSQL_PASSWORD: wppass
+
+  wp1:
+    depends_on:
+      - db
+    image: local/apache-php
+    links:
+      - db
+    ports:
+      - "8001:80"
+    restart: always
+
+  wp2:
+    depends_on:
+     - db
+    image: local/apache-php
+    links:
+     - db
+    ports:
+     - "8002:80"
+    restart: always
+
+  wp3:
+    depends_on:
+    - db
+    image: local/apache-php
+    links:
+    - db
+    ports:
+    - "8003:80"
+    restart: always
+
+  proxy:
+    image: local/myproxy
+    links:
+      - wp1
+      - wp2
+      - wp3
+    ports:
+      - "80:80"
+      - "70:70"
+    restart: always
+
+
